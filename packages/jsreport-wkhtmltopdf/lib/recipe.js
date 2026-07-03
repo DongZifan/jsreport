@@ -1,4 +1,5 @@
 const path = require('path')
+const fs = require('fs')
 const childProcess = require('child_process')
 const wkhtmltopdf = require('wkhtmltopdf-installer')
 
@@ -30,17 +31,35 @@ module.exports = async (reporter, definition, request, response) => {
   }
 }
 
-function createParams (reporter, request, options, definition, paths) {
+function parseBool(val) {
+  if (typeof val === 'boolean') return val
+  if (typeof val !== 'string') return false
+  try {
+    return JSON.parse(val)
+  } catch (e) {
+    return false
+  }
+}
+
+function createParams(reporter, request, options, definition, paths) {
   const params = []
 
-  params.push('--debug-javascript')
+  if (options.debugJavascript) {
+    params.push('--debug-javascript')
+  }
 
   if (!options.allowLocalFilesAccess) {
     params.push('--disable-local-file-access')
   }
 
+  const allowedKeys = ['grayscale', 'lowquality', 'noBackground', 'noImages', 'noPdfCompression']
+
   Object.keys(definition.options).forEach(function (k) {
     if (k === 'allowLocalFilesAccess' || k === 'wkhtmltopdfVersions' || k === 'execOptions') {
+      return
+    }
+
+    if (!allowedKeys.includes(k)) {
       return
     }
 
@@ -136,19 +155,19 @@ function createParams (reporter, request, options, definition, paths) {
     params.push('file:///' + paths['template-cover'])
   }
 
-  if (options.keepRelativeLinks && JSON.parse(options.keepRelativeLinks)) {
+  if (options.keepRelativeLinks && parseBool(options.keepRelativeLinks)) {
     params.push('--keep-relative-links')
   }
 
-  if (options.printMediaType && JSON.parse(options.printMediaType)) {
+  if (options.printMediaType && parseBool(options.printMediaType)) {
     params.push('--print-media-type')
   }
 
-  if (options.disableSmartShrinking && JSON.parse(options.disableSmartShrinking)) {
+  if (options.disableSmartShrinking && parseBool(options.disableSmartShrinking)) {
     params.push('--disable-smart-shrinking')
   }
 
-  if (options.toc && JSON.parse(options.toc)) {
+  if (options.toc && parseBool(options.toc)) {
     params.push('toc')
 
     if (options.tocHeaderText) {
@@ -171,7 +190,7 @@ function createParams (reporter, request, options, definition, paths) {
 
   const outputPath = path.join(
     path.dirname(paths.template),
-        `${path.basename(paths.template, '.html')}.pdf`
+    `${path.basename(paths.template, '.html')}.pdf`
   )
 
   params.push(outputPath)
@@ -179,7 +198,7 @@ function createParams (reporter, request, options, definition, paths) {
   return params
 }
 
-async function processPart (reporter, options, req, type, paths) {
+async function processPart(reporter, options, req, type, paths) {
   if (!options[type]) {
     return
   }
@@ -211,13 +230,13 @@ async function processPart (reporter, options, req, type, paths) {
   }
 }
 
-async function processHeaderAndFooter (reporter, options, req, paths) {
+async function processHeaderAndFooter(reporter, options, req, paths) {
   await processPart(reporter, options, req, 'header', paths)
   await processPart(reporter, options, req, 'footer', paths)
   await processPart(reporter, options, req, 'cover', paths)
 }
 
-function conversion (reporter, definition, parameters, request) {
+function conversion(reporter, definition, parameters, request) {
   let exePath = wkhtmltopdf.path
 
   if (request.template.wkhtmltopdf.wkhtmltopdfVersion) {
@@ -225,9 +244,12 @@ function conversion (reporter, definition, parameters, request) {
       return p.version === request.template.wkhtmltopdf.wkhtmltopdfVersion
     })
 
-    // default doesn't have a path
     if (wkhtmltopdfVersions.length === 1 && wkhtmltopdfVersions[0].path) {
-      exePath = wkhtmltopdfVersions[0].path
+      const customPath = wkhtmltopdfVersions[0].path
+      const wkhtmlDir = path.dirname(wkhtmltopdf.path)
+      if (fs.existsSync(customPath) && path.dirname(customPath) === wkhtmlDir) {
+        exePath = customPath
+      }
     }
   }
 
@@ -236,6 +258,8 @@ function conversion (reporter, definition, parameters, request) {
   const timeout = reporter.getReportTimeout(request)
 
   const execOptions = Object.assign({}, definition.options.execOptions)
+
+  delete execOptions.shell
 
   if (timeout != null) {
     execOptions.timeout = timeout
