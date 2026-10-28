@@ -237,4 +237,55 @@ describe('contentManager', () => {
 
     should(output).be.eql('<row r="3" spans="3:5" x14ac:dyDescent="0.2"><c r="C3" s="1" t="s"><v>1</v></c></row><row r="4" spans="3:5" x14ac:dyDescent="0.2"><c r="C4" s="1" t="s"><v>1</v></c><c r="D4" s="1" t="s"><v>3</v></c></row><row r="5" spans="3:5" x14ac:dyDescent="0.2"/>')
   })
+
+  it('render instances in the order they were added when part has sequence placement', () => {
+    const doc = new DOMParser().parseFromString(`
+      <sheetData><row r="2" s="1"><c r="C2" s="1" t="s"><v>1</v></c><c r="D2" s="1" t="s"><v>3</v></c></row><row r="3" s="2"><c r="C3" t="s"><v>0</v></c></row></sheetData>
+    `)
+
+    const testCollection = createContentCollectionManager()
+
+    testCollection.set('sheetData', {
+      prepare: () => {
+        const elements = Array.from(doc.documentElement.childNodes)
+
+        return {
+          parts: {
+            row: {
+              type: 'instanceCollection',
+              idAttrs: ['r'],
+              placement: 'sequence',
+              parts: {
+                c: {
+                  type: 'instanceCollection',
+                  idAttrs: ['r'],
+                  placement: 'sequence'
+                }
+              }
+            }
+          },
+          elements
+        }
+      }
+    })
+
+    const rowPart = testCollection.get('sheetData').parts.get('row')
+
+    // simulates a block loop over base rows 2, 3 (producing rows 2, 3, 4, 5) and
+    // a vertical loop in base cell C2 (producing cells C2, D2 and moving base cell D2 to E2)
+    rowPart.addInstance(['2'], ['2'], {})
+    rowPart.get('2').parts.get('c').addInstance(['C2'], ['C2'], {})
+    rowPart.get('2').parts.get('c').addInstance(['C2'], ['D2'], {})
+    rowPart.get('2').parts.get('c').addInstance(['D2'], ['E2'], {})
+    rowPart.addInstance(['3'], ['3'], {})
+    rowPart.get('3').parts.get('c').addInstance(['C3'], ['C3'], {})
+    rowPart.addInstance(['2'], ['4'], {})
+    rowPart.get('4').parts.get('c').addInstance(['C2'], ['C4'], {})
+    rowPart.addInstance(['3'], ['5'], {})
+    rowPart.get('5').parts.get('c').addInstance(['C3'], ['C5'], {})
+
+    const output = testCollection.get('sheetData').render()
+
+    should(output).be.eql('<row r="2" s="1"><c r="C2" s="1" t="s"><v>1</v></c><c r="D2" s="1" t="s"><v>1</v></c><c r="E2" s="1" t="s"><v>3</v></c></row><row r="3" s="2"><c r="C3" t="s"><v>0</v></c></row><row r="4" s="1"><c r="C4" s="1" t="s"><v>1</v></c></row><row r="5" s="2"><c r="C5" t="s"><v>0</v></c></row>')
+  })
 })

@@ -111,7 +111,12 @@ module.exports = function createElementsReplacer (getElements, opts) {
             createElement = false
 
             if (renderOpts.onSlot) {
-              itemChildren = renderOpts.onSlot(ctx, currentItem.slot)
+              const slotResult = renderOpts.onSlot(ctx, currentItem.slot)
+
+              if (slotResult != null) {
+                // slot items can produce new elements or extend any base item (by its registry index)
+                itemChildren = normalizeOutputItems(slotResult, itemChildrenCtx)
+              }
             }
           } else {
             fromMainBase = true
@@ -159,19 +164,7 @@ module.exports = function createElementsReplacer (getElements, opts) {
                 createElement = false
                 // replace { extend: "true" } entries for the original item index, so we can reuse the
                 // original item when it gets processed
-                itemChildren = matchResult.map(({ ctx, ...restOfMatch }) => {
-                  const normalizedMatch = restOfMatch
-
-                  if (normalizedMatch.extend === true) {
-                    normalizedMatch.extend = item
-                  }
-
-                  if (ctx != null) {
-                    itemChildrenCtx.set(normalizedMatch, ctx)
-                  }
-
-                  return normalizedMatch
-                })
+                itemChildren = normalizeOutputItems(matchResult, itemChildrenCtx, item)
               }
             }
           }
@@ -241,6 +234,26 @@ module.exports = function createElementsReplacer (getElements, opts) {
       return parts.join('')
     }
   }
+}
+
+function normalizeOutputItems (outputItems, itemsCtx, matchedItemIdx) {
+  return outputItems.map(({ ctx, ...restOfItem }) => {
+    const normalizedItem = restOfItem
+
+    if (normalizedItem.extend === true) {
+      if (matchedItemIdx == null) {
+        throw new Error('"extend: true" is only supported for items returned from a match')
+      }
+
+      normalizedItem.extend = matchedItemIdx
+    }
+
+    if (ctx != null) {
+      itemsCtx.set(normalizedItem, ctx)
+    }
+
+    return normalizedItem
+  })
 }
 
 function createTextRegistry () {

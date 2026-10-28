@@ -4,6 +4,13 @@ const createIdHandler = require('./idHandler')
 const simpleCollection = require('./simpleCollection')
 const instanceCollection = require('./instanceCollection')
 
+/**
+ * - "base" renders the instances in the position of its base element,
+ * - "sequence" renders all the instances (in the order they were added)
+ *    in the position of the first base element of the part, the base elements are just used as templates
+ */
+const PLACEMENTS = ['base', 'sequence']
+
 const partTypeHandlers = new Map([
   ['singleItem', {
     createPart: createSinglePart,
@@ -93,6 +100,17 @@ function createContentManager (options = {}) {
         newPartDef.idAttrs = createIdHandler(partDef.idAttrs, ATTRIBUTE_SEPARATOR)
       }
 
+      if (partDef.placement != null) {
+        assert.ok(partDef.type === 'instanceCollection', `Part "${partName}" - placement is only supported for instanceCollection type`)
+        assert.ok(PLACEMENTS.includes(partDef.placement), `Part "${partName}" - placement "${partDef.placement}" is not supported`)
+      }
+
+      if (partDef.type === 'instanceCollection') {
+        newPartDef.placement = partDef.placement ?? 'base'
+      } else {
+        newPartDef.placement = 'base'
+      }
+
       partsContainer.set(partName, newPartDef)
 
       if (isTopLevel) {
@@ -150,6 +168,12 @@ function createContentManager (options = {}) {
 
       const targetBaseItems = baseItemsPartsContainer.get(el.nodeName)
 
+      // for sequence placement, the instances are rendered from a slot placed
+      // at the first base element of the part in the container
+      if (partDef.placement === 'sequence' && targetBaseItems.size === 0) {
+        ctx.addSlot(el.nodeName)
+      }
+
       let idValue
 
       if (partDef.type !== 'singleItem') {
@@ -160,6 +184,8 @@ function createContentManager (options = {}) {
 
       const baseItem = {
         index: targetBaseItems.size,
+        // reference to the base element, used to produce elements from it
+        registryIdx: ctx.registryIdx,
         data: {},
         parts: new Map()
       }
@@ -200,6 +226,12 @@ function createContentManager (options = {}) {
 
         const output = []
 
+        if (part.placement === 'sequence') {
+          // when using "sequence" the instances are rendered from the slot,
+          // no on match
+          return output
+        }
+
         if (part.type === 'singleItem') {
           const item = part.get()
 
@@ -216,21 +248,12 @@ function createContentManager (options = {}) {
           const itemsIds = part.getInstances(baseId)
 
           for (const itemId of itemsIds) {
-            const item = part.get(itemId)
-            let attributes = idToAttributes(itemId)
-
-            const { attributes: elAttributes, ...elRest } = item.data
-
-            if (elAttributes != null) {
-              attributes = new Map([...attributes, ...elAttributes])
-            }
-
-            output.push({
-              attributes,
-              ...elRest,
-              ctx: part.get(itemId)?.parts ?? new Map(),
+            output.push(createInstanceOutput({
+              part,
+              idToAttributes,
+              itemId,
               extend: true
-            })
+            }))
           }
         }
 
@@ -249,6 +272,18 @@ function createContentManager (options = {}) {
         if (part.type === 'singleItem') {
           if (part.has()) {
             output.push({ name: slotName, ...part.get().data })
+          }
+        } else if (part.placement === 'sequence') {
+          const idToAttributes = createIdToAttributes(part.idAttrs)
+
+          // .all() returns the instances in the order they were added
+          for (const [itemId, item] of part.all()) {
+            output.push(createInstanceOutput({
+              part,
+              idToAttributes,
+              itemId,
+              extend: part.getBase(item.baseId).registryIdx
+            }))
           }
         } else {
           const idToAttributes = createIdToAttributes(part.idAttrs)
@@ -300,6 +335,7 @@ function createPartCollection (partDef, baseItems) {
       items.set(id, newItem)
 
       if (baseId != null) {
+        newItem.baseId = baseId
         linkBaseAndItem(baseId, id)
       } else {
         newItemsIds.add(id)
@@ -313,6 +349,9 @@ function createPartCollection (partDef, baseItems) {
     },
     get idAttrs () {
       return partDef.idAttrs
+    },
+    get placement () {
+      return partDef.placement
     },
     getBase (_baseKey) {
       const baseKey = partDef.idAttrs.getValue(_baseKey)
@@ -360,6 +399,24 @@ function createPartCollection (partDef, baseItems) {
   Object.assign(partCollection, partCollectionType)
 
   return partCollection
+}
+
+function createInstanceOutput ({ part, idToAttributes, itemId, extend }) {
+  const item = part.get(itemId)
+  let attributes = idToAttributes(itemId)
+
+  const { attributes: elAttributes, ...elRest } = item.data
+
+  if (elAttributes != null) {
+    attributes = new Map([...attributes, ...elAttributes])
+  }
+
+  return {
+    attributes,
+    ...elRest,
+    ctx: item.parts ?? new Map(),
+    extend
+  }
 }
 
 function createSinglePart (partDef, baseItems) {

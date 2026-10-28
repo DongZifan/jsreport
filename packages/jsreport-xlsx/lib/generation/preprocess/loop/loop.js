@@ -447,10 +447,14 @@ module.exports = ({ files, sharedData, addEndCallback }) => {
             row: {
               type: 'instanceCollection',
               idAttrs: ['r'],
+              // we render rows and cells in the order they were generated,
+              // which is the order expected in sheetData
+              placement: 'sequence',
               parts: {
                 c: {
                   type: 'instanceCollection',
-                  idAttrs: ['r']
+                  idAttrs: ['r'],
+                  placement: 'sequence'
                 }
               }
             }
