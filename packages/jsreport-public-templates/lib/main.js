@@ -43,7 +43,12 @@ function routes (reporter) {
     app.get('/public-templates', (req, res, next) => {
       const templatesCol = reporter.documentStore.collection('templates')
 
-      templatesCol.findOne({ readSharingToken: req.query.access_token }).then((template) => {
+      // the access token is expected to be a string, we normalize the value to string for
+      // security in case the query param gets parsed as an object
+      // (via the default express extended query parsing)
+      const accessToken = req.query.access_token?.toString()
+
+      templatesCol.findOne({ readSharingToken: accessToken }).then((template) => {
         if (!template) {
           return res.status(401).end('Invalid access token or template is no longer shared')
         }

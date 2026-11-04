@@ -1,6 +1,6 @@
 {
   "name": "@jsreport/jsreport-scheduling",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "jsreport extension for scheduling background rendering jobs",
   "keywords": [
     "jsreport",
@@ -30,14 +30,14 @@
   },
   "dependencies": {
     "cron-parser": "5.0.1",
-    "moment": "2.29.4"
+    "moment": "2.31.0"
   },
   "devDependencies": {
-    "@jsreport/jsreport-authentication": "4.3.1",
+    "@jsreport/jsreport-authentication": "4.3.5",
     "@jsreport/jsreport-authorization": "4.2.0",
-    "@jsreport/jsreport-core": "4.10.0",
+    "@jsreport/jsreport-core": "4.11.3",
     "@jsreport/jsreport-reports": "4.3.0",
-    "@jsreport/studio-dev": "4.1.0",
+    "@jsreport/studio-dev": "4.1.1",
     "cron-builder": "0.3.0",
     "cronstrue": "1.64.0",
     "lodash": "4.18.1",

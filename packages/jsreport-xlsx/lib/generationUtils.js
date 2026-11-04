@@ -103,17 +103,17 @@ function getIncrementWithLoop (mode, { loopId, loopIndex, rowNumber, evaluatedLo
   return { increment, currentLoopIncrement, previousRootLoopIncrement, previousLoopIncrement }
 }
 
-function getParentLoopItemByHierarchy (childLoopItem, loopItems) {
-  assertOk(childLoopItem != null, 'getParentLoopItemByHierarchy childLoopItem arg is required')
-  assertOk(Array.isArray(loopItems), 'getParentLoopItemByHierarchy loopItems arg is invalid')
+function getParentLoopItem (childLoopItem, loopItems, targetId = 'id') {
+  assertOk(childLoopItem != null, 'getParentLoopItem childLoopItem arg is required')
+  assertOk(Array.isArray(loopItems), 'getParentLoopItem loopItems arg is invalid')
 
-  const parentHierarchyId = childLoopItem.hierarchyId.split('#').slice(0, -1).join('#')
+  const parentTargetId = childLoopItem[targetId].split('#').slice(0, -1).join('#')
 
-  if (parentHierarchyId === '') {
+  if (parentTargetId === '') {
     return
   }
 
-  return getLoopItemById({ idName: 'hierarchyId', idValue: parentHierarchyId }, loopItems)
+  return getLoopItemById({ idName: targetId, idValue: parentTargetId }, loopItems)
 }
 
 function getCurrentLoopItem (loopId, loopItems) {
@@ -246,11 +246,11 @@ function updateDimension (runtime, cellNumbers) {
   }
 }
 
-function updateMergeCells (mergeCellItems, originalCellInfo, updatedStartCell) {
-  const { newValue } = evaluateCellRefsFromExpression(originalCellInfo.ref, (cellRefInfo) => {
+function updateMergeCell (originalRef, updatedStartCell) {
+  const { newValue } = evaluateCellRefsFromExpression(originalRef, (cellRefInfo) => {
     const isRange = cellRefInfo.type === 'rangeStart' || cellRefInfo.type === 'rangeEnd'
 
-    assertOk(isRange, `cell ref expected to be a range. value: "${originalCellInfo.ref}"`)
+    assertOk(isRange, `cell ref expected to be a range. value: "${originalRef}"`)
 
     const columnIncrement = cellRefInfo.type === 'rangeEnd' ? cellRefInfo.parsedRangeEnd.columnNumber - cellRefInfo.parsedRangeStart.columnNumber : 0
     const [newColumnLetter] = getColumnFor(updatedStartCell.letter, columnIncrement)
@@ -266,7 +266,7 @@ function updateMergeCells (mergeCellItems, originalCellInfo, updatedStartCell) {
     return newCellRef
   })
 
-  mergeCellItems.push({ idx: originalCellInfo.idx, ref: newValue })
+  return newValue
 }
 
 function renderDataItems (doc, dataItems, meta, outputFullDocument = true) {
@@ -693,10 +693,10 @@ function tryToResolvePendingLazyFormula (lazyFormulaId, cellRef, lazyFormulas, t
 
 module.exports.assertOk = assertOk
 module.exports.getIncrementWithLoop = getIncrementWithLoop
-module.exports.getParentLoopItemByHierarchy = getParentLoopItemByHierarchy
+module.exports.getParentLoopItem = getParentLoopItem
 module.exports.getCurrentLoopItem = getCurrentLoopItem
 module.exports.updateDimension = updateDimension
-module.exports.updateMergeCells = updateMergeCells
+module.exports.updateMergeCell = updateMergeCell
 module.exports.renderDataItems = renderDataItems
 module.exports.getAttributeFromElementTypeAttributes = getAttributeFromElementTypeAttributes
 module.exports.getNewFormula = getNewFormula

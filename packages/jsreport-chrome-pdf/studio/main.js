@@ -60,9 +60,7 @@ class ChromePdfProperties extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     });
   }
   applyDefaultsToEntity(props) {
-    const {
-      entity
-    } = props;
+    const entity = props.entity;
     let entityNeedsDefault = false;
     if (entity.__isNew && (entity.chrome == null || entity.chrome.printBackground == null)) {
       entityNeedsDefault = true;
@@ -74,10 +72,8 @@ class ChromePdfProperties extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     }
   }
   changeChrome(props, change) {
-    const {
-      entity,
-      onChange
-    } = props;
+    const entity = props.entity,
+      onChange = props.onChange;
     const chrome = entity.chrome || {};
     onChange({
       ...entity,
@@ -88,9 +84,7 @@ class ChromePdfProperties extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     });
   }
   render() {
-    const {
-      entity
-    } = this.props;
+    const entity = this.props.entity;
     const chrome = entity.chrome || {};
     const changeChrome = this.changeChrome;
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
@@ -117,6 +111,17 @@ class ChromePdfProperties extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
       checked: chrome.printBackground === true,
       onChange: v => changeChrome(this.props, {
         printBackground: v.target.checked
+      })
+    })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "form-group"
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("label", {
+      title: "Chrome generates a tagged (accessible) pdf by default. Unselect to disable it, which produces significantly smaller files and allows bigger reports to be rendered."
+    }, "tagged pdf"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("input", {
+      type: "checkbox",
+      title: "Chrome generates a tagged (accessible) pdf by default. Unselect to disable it, which produces significantly smaller files and allows bigger reports to be rendered.",
+      checked: chrome.tagged == null || chrome.tagged === true,
+      onChange: v => changeChrome(this.props, {
+        tagged: v.target.checked
       })
     })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
       className: "form-group"
@@ -303,10 +308,8 @@ class ImageProperties extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     this.changeChrome = this.changeChrome.bind(this);
   }
   changeChrome(props, change) {
-    const {
-      entity,
-      onChange
-    } = props;
+    const entity = props.entity,
+      onChange = props.onChange;
     const chromeImage = entity.chromeImage || {};
     onChange({
       ...entity,
@@ -317,9 +320,7 @@ class ImageProperties extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
     });
   }
   render() {
-    const {
-      entity
-    } = this.props;
+    const entity = this.props.entity;
     const chrome = entity.chromeImage || {};
     const changeChrome = this.changeChrome;
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
@@ -514,12 +515,11 @@ __webpack_require__.r(__webpack_exports__);
 
 class ChromeEditor extends react__WEBPACK_IMPORTED_MODULE_0__.Component {
   render() {
-    const {
-      entity,
-      onUpdate,
-      headerOrFooter,
-      tab
-    } = this.props;
+    const _this$props = this.props,
+      entity = _this$props.entity,
+      onUpdate = _this$props.onUpdate,
+      headerOrFooter = _this$props.headerOrFooter,
+      tab = _this$props.tab;
     const editorName = `${entity._id}_${tab.docProp.replace(/\./g, '_')}`;
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(jsreport_studio__WEBPACK_IMPORTED_MODULE_1__.TextEditor, {
       name: editorName,

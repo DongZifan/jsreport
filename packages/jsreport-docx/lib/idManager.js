@@ -1,10 +1,4 @@
 
-const idPrefixMap = Object.assign(Object.create(null), {
-  documentRels: 'rId',
-  shapeType: '_jsr_t',
-  shape: '_jsr_i'
-})
-
 function createCollectionManager (isGlobal = true) {
   const collection = new Map()
 
@@ -87,16 +81,10 @@ function createIdManager (name, options = {}) {
   assertOk(!(fromItems == null && fromMaxId == null), 'either fromItems or fromMaxId implementation must be provided')
   assertOk(!(fromItems != null && fromMaxId != null), 'only one implementation fromItems or fromMaxId can be provided')
 
-  let prefix
+  const prefix = options.prefix
 
-  if (options.prefix != null) {
-    prefix = options.prefix
-  } else {
-    prefix = idPrefixMap[name]
-
-    if (prefix == null) {
-      throw new Error(`default prefix for "${name}" not found`)
-    }
+  if (prefix == null) {
+    throw new Error(`prefix for "${name}" not found`)
   }
 
   let maxNumId

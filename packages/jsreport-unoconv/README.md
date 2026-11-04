@@ -11,6 +11,9 @@ See https://jsreport.net/learn/unoconv
 
 ## Changelog
 
+### 4.2.1
+- validate output format argument
+
 ### 4.2.0
 - minimum node.js version is now `22.18.0`
 

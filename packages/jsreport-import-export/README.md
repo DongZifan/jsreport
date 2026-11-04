@@ -7,6 +7,19 @@ See http://jsreport.net/learn/import-export
 
 ## Changelog
 
+### 4.1.5
+- update multer to fix audit
+
+### 4.1.4
+- update axios, multer to fix audit
+
+### 4.1.3
+- update deps to fix audit
+
+### 4.1.2
+- update deps to fix audit
+- fix setting maxContentLength, maxBodyLength to unlimited after axios update
+
 ### 4.1.1
 - update deps to fix audit
 

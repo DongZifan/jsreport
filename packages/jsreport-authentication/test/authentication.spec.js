@@ -92,6 +92,12 @@ describe('authentication', () => {
       .expect(200)
   })
 
+  it('should 401 when calling api/report with route param with extension', () => {
+    return request(reporter.express.app).post('/api/report/foo.js')
+      .send({ template: { content: 'foo', engine: 'none', recipe: 'html' } })
+      .expect(401)
+  })
+
   it('should 401 when calling api without auth header', () => {
     return request(reporter.express.app).get('/api/version')
       .expect(401)
@@ -105,6 +111,36 @@ describe('authentication', () => {
 
   it('should 400 when returnUrl is absolute', () => {
     return request(reporter.express.app).post('/login?returnUrl=https://jsreport.net')
+      .type('form')
+      .send({ username: 'admin', password: 'password' })
+      .expect(400)
+  })
+
+  it('should 400 when returnUrl contains backslash', () => {
+    return request(reporter.express.app).post('/login?returnUrl=/\\evil.com')
+      .type('form')
+      .send({ username: 'admin', password: 'password' })
+      .expect(400)
+  })
+
+  it('should 400 when returnUrl contains a double url encoded forward slash', () => {
+    return request(reporter.express.app).post('/login?returnUrl=%252f%252fevil.com')
+      .type('form')
+      .send({ username: 'admin', password: 'password' })
+      .expect(400)
+  })
+
+  it('should 400 when returnUrl contains a tab before a protocol-relative host', () => {
+    // browsers strip tab/newline/CR from a URL before parsing it, so "/\t/evil.com"
+    // is read as "//evil.com", a redirect to a different host
+    return request(reporter.express.app).post('/login?returnUrl=' + encodeURIComponent('/\t/evil.com'))
+      .type('form')
+      .send({ username: 'admin', password: 'password' })
+      .expect(400)
+  })
+
+  it('should 400 when returnUrl contains a newline before a protocol-relative host', () => {
+    return request(reporter.express.app).post('/login?returnUrl=' + encodeURIComponent('/\n/evil.com'))
       .type('form')
       .send({ username: 'admin', password: 'password' })
       .expect(400)

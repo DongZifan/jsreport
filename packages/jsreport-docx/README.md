@@ -7,6 +7,18 @@ See the documentation https://jsreport.net/learn/docx
 
 ## Changelog
 
+### 4.11.2
+- update moment, axios to fix audit
+- get back to image-size (from image-size-next), audit issues for it are solved
+
+### 4.11.1
+- update deps to fix audit
+
+### 4.11.0
+- update deps to fix audit
+- add support for docxImage helper to work without placeholder image
+- handle missing w:tcW in table preprocess (Google Docs DOCX exports)
+
 ### 4.10.2
 - update deps to fix audit
 - fix section breaks not working with loop

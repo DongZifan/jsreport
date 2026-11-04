@@ -34,6 +34,7 @@ function getNewRelIdFromBaseId (relsDoc, itemsMap, baseRelId) {
   }
 
   const documentRelsIdManager = createIdManager('documentRels', {
+    prefix: 'rId',
     fromItems: {
       getIds: () => nodeListToArray(relsDoc.getElementsByTagName('Relationship')).map((el) => el.getAttribute('Id')),
       getNumberId

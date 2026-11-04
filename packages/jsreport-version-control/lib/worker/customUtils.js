@@ -1,7 +1,14 @@
 const { serialize: _serialize, parse: _parse } = require('@jsreport/serializator')
 
 function deepGet (doc, path) {
+  // deny getting properties if any of them are not owned directly on the object
+  // (like properties coming from the prototype chain)
+  if (!deepHasOwnProperty(doc, path)) {
+    return
+  }
+
   const paths = path.split('.')
+
   for (let i = 0; i < paths.length && doc; i++) {
     doc = doc[paths[i]]
   }
@@ -10,7 +17,14 @@ function deepGet (doc, path) {
 }
 
 function deepDelete (doc, path) {
+  // deny deleting properties if any of them are not owned directly on the object
+  // (like properties coming from the prototype chain)
+  if (!deepHasOwnProperty(doc, path)) {
+    return
+  }
+
   const paths = path.split('.')
+
   for (let i = 0; i < paths.length && doc; i++) {
     if (i === paths.length - 1) {
       delete doc[paths[i]]
@@ -22,6 +36,25 @@ function deepDelete (doc, path) {
 
 function deepSet (doc, path, val) {
   const paths = path.split('.')
+
+  // deny setting unsafe properties (prototype mutation keys)
+  let containsPrototypeKeys = false
+  const prototypeKeys = ['__proto__', 'constructor', 'prototype']
+  let tmpDoc = doc
+
+  for (let i = 0; i < paths.length && tmpDoc; i++) {
+    if (prototypeKeys.includes(paths[i])) {
+      containsPrototypeKeys = true
+      break
+    }
+
+    tmpDoc = tmpDoc[paths[i]]
+  }
+
+  if (containsPrototypeKeys) {
+    return
+  }
+
   for (let i = 0; i < paths.length && doc; i++) {
     if (i === paths.length - 1) {
       doc[paths[i]] = val
@@ -37,7 +70,7 @@ function deepHasOwnProperty (doc, path) {
   let has = false
 
   for (let i = 0; i < paths.length && doc; i++) {
-    has = Object.prototype.hasOwnProperty.call(doc, paths[i])
+    has = Object.hasOwn(doc, paths[i])
 
     if (!has) {
       break
@@ -133,8 +166,8 @@ function deepEqual (x, y, isRootCall = true) {
 
 module.exports.deepGet = deepGet
 module.exports.deepSet = deepSet
-module.exports.deepDelete = deepDelete
 module.exports.deepHasOwnProperty = deepHasOwnProperty
+module.exports.deepDelete = deepDelete
 module.exports.serialize = serialize
 module.exports.parse = parse
 module.exports.deepEqual = deepEqual

@@ -113,13 +113,42 @@ function getNewIdFromBaseId (itemsMap, baseId, maxId) {
   return maxId + 1
 }
 
-function findOrCreateChildNode (docNode, nodeName, targetNode) {
+function findOrCreateChildNode (docNode, nodeNameDef, targetNode) {
+  let nodeName
+  let beforeRefs
+
+  if (Array.isArray(nodeNameDef)) {
+    [nodeName, beforeRefs] = nodeNameDef
+  } else {
+    nodeName = nodeNameDef
+  }
+
   let result
   const existingNode = findChildNode(nodeName, targetNode)
 
   if (!existingNode) {
     result = docNode.createElement(nodeName)
-    targetNode.appendChild(result)
+
+    let refNode
+
+    if (beforeRefs) {
+      const targetRefs = Array.isArray(beforeRefs) ? beforeRefs : [beforeRefs]
+
+      for (let idx = targetRefs.length - 1; idx >= 0; idx--) {
+        const ref = targetRefs[idx]
+        refNode = findChildNode(ref, targetNode)
+
+        if (refNode) {
+          break
+        }
+      }
+    }
+
+    if (refNode) {
+      targetNode.insertBefore(result, refNode.nextSibling)
+    } else {
+      targetNode.appendChild(result)
+    }
   } else {
     result = existingNode
   }
@@ -127,14 +156,15 @@ function findOrCreateChildNode (docNode, nodeName, targetNode) {
   return result
 }
 
-function findChildNode (nodeName, targetNode, allNodes = false) {
+function findChildNode (anyOfNodeName, targetNode, allNodes = false) {
+  const targetNodeNames = Array.isArray(anyOfNodeName) ? anyOfNodeName : [anyOfNodeName]
   const result = []
 
   for (let i = 0; i < targetNode.childNodes.length; i++) {
     let found = false
     const childNode = targetNode.childNodes[i]
 
-    if (childNode.nodeName === nodeName) {
+    if (targetNodeNames.includes(childNode.nodeName)) {
       found = true
       result.push(childNode)
     }
@@ -547,8 +577,7 @@ function getSheetInfo (_sheetPath, workbookSheetsEls, workbookRelsEls) {
   return {
     id: sheetEl.getAttribute('sheetId'),
     name: sheetEl.getAttribute('name'),
-    rId: sheetRefEl.getAttribute('Id'),
-    path: sheetPath
+    rId: sheetRefEl.getAttribute('Id')
   }
 }
 
@@ -670,11 +699,45 @@ function normalizeAttributeAndTextNodeForHandlebars (node) {
 }
 
 function serializeXmlAsHandlebarsSafeOutput (docOrNode) {
-  return new XMLSerializer().serializeToString(
-    docOrNode,
-    undefined,
-    normalizeAttributeAndTextNodeForHandlebars
-  )
+  let targets = docOrNode
+
+  if (!Array.isArray(docOrNode)) {
+    targets = [docOrNode]
+  }
+
+  const output = []
+
+  for (const target of targets) {
+    output.push(new XMLSerializer().serializeToString(
+      target,
+      undefined,
+      normalizeAttributeAndTextNodeForHandlebars
+    ))
+  }
+
+  return output.join('')
+}
+
+function processOpeningTag (doc, refElement, helperCall) {
+  const fakeElement = doc.createElement('xlsxRemove')
+  fakeElement.textContent = helperCall
+
+  if (refElement !== false) {
+    refElement.parentNode.insertBefore(fakeElement, refElement)
+  }
+
+  return fakeElement
+}
+
+function processClosingTag (doc, refElement, closeCall) {
+  const fakeElement = doc.createElement('xlsxRemove')
+  fakeElement.textContent = closeCall
+
+  if (refElement !== false) {
+    refElement.parentNode.insertBefore(fakeElement, refElement.nextSibling)
+  }
+
+  return fakeElement
 }
 
 module.exports.contentIsXML = (content) => {
@@ -717,6 +780,8 @@ module.exports.findOrCreateChildNode = findOrCreateChildNode
 module.exports.findChildNode = findChildNode
 module.exports.recreateNodeWithNewDoc = recreateNodeWithNewDoc
 module.exports.nodeListToArray = nodeListToArray
+module.exports.processOpeningTag = processOpeningTag
+module.exports.processClosingTag = processClosingTag
 module.exports.isWorksheetFile = isWorksheetFile
 module.exports.isWorksheetRelsFile = isWorksheetRelsFile
 module.exports.getDataHelperCall = getDataHelperCall

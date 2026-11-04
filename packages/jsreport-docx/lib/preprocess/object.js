@@ -17,6 +17,7 @@ module.exports = (files, headerFooterRefs, sharedData) => {
     }
 
     sharedData.localIdManagers(targetPath).set('shapeType', {
+      prefix: '_jsr_t',
       fromItems: shapeTypeFromItems
     })
 
@@ -27,6 +28,7 @@ module.exports = (files, headerFooterRefs, sharedData) => {
 
     if (!sharedData.idManagers.has('shape')) {
       sharedData.idManagers.set('shape', {
+        prefix: '_jsr_i',
         fromItems: shapeFromItems
       })
     } else {

@@ -7,6 +7,19 @@ See https://jsreport.net/learn/docker-workers
 
 ## Changelog
 
+### 4.0.6
+- update axios, express to fix audit
+
+### 4.0.5
+- fix handleRemoteHttpResponse function signature
+
+### 4.0.4
+- remove node.extend dep
+
+### 4.0.3
+- remove ip dep to fix audit
+- fix sharedTempRewriteRootPathTo replace and temp files cleanup
+
 ### 4.0.2
 
 - fix temp autocleanup

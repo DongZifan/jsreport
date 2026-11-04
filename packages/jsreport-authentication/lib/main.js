@@ -16,7 +16,6 @@ const BasicStrategy = require('passport-http').BasicStrategy
 const BearerStrategy = require('passport-http-bearer').Strategy
 const { Issuer, Strategy: OpenIdStrategy, custom: openidCustom } = require('openid-client')
 const sessions = require('client-sessions')
-const url = require('url')
 const bodyParser = require('body-parser')
 const UsersRepository = require('./usersRepository')
 const { shouldDelegateTokenAuth, hasBearerSchema, authenticateToken } = require('./externalAuthentication.js')
@@ -24,7 +23,7 @@ const viewsPath = path.join(__dirname, '../public/views')
 const basicSchemaReg = /Basic/i
 const bearerSchemaReg = /Bearer/i
 // eslint-disable-next-line
-const absoluteUrlReg = new RegExp('^(?:[a-z]+:)?//', 'i')
+const ABSOLUTE_URL_REGEXP = new RegExp('^(?:[a-z]+:)?//', 'i')
 
 function addPassport (reporter, app, admin, definition) {
   if (app.isAuthenticated) {
@@ -280,9 +279,10 @@ function addPassport (reporter, app, admin, definition) {
     })
 
     app.post('/login', bodyParser.urlencoded({ extended: true, limit: '2mb' }), (req, res, next) => {
-      if (req.query.returnUrl && absoluteUrlReg.test(req.query.returnUrl)) {
+      if (req.query.returnUrl && isUnsecureURL(req.query.returnUrl)) {
         return res.status(400).end('Unsecure returnUrl')
       }
+
       req.session.viewModel = req.session.viewModel || {}
 
       passport.authenticate('local', (err, user) => {
@@ -293,6 +293,7 @@ function addPassport (reporter, app, admin, definition) {
         if (err || !user) {
           const info = (err ? err.authInfo : undefined) || {}
           req.session.viewModel.login = info.message
+          // in this case encode the returnUrl, it is a URI component of the redirect url
           return res.redirect(reporter.options.appPath + '?returnUrl=' + encodeURIComponent(req.query.returnUrl || '/'))
         }
 
@@ -306,7 +307,8 @@ function addPassport (reporter, app, admin, definition) {
           req.context.user = req.user = user
           reporter.logger.info(`Logging in user ${user.name}`)
 
-          return res.redirect(decodeURIComponent(req.query.returnUrl) || reporter.options.appPath)
+          // in this case use url as it is, it is already validated and decoded by express
+          return res.redirect(req.query.returnUrl || reporter.options.appPath)
         })
       })(req, res, next)
     })
@@ -396,7 +398,7 @@ function addPassport (reporter, app, admin, definition) {
 
   if (supportsAuthorizationServer) {
     app.get('/auth-server/login', (req, res, next) => {
-      if (req.query.returnUrl && absoluteUrlReg.test(req.query.returnUrl)) {
+      if (req.query.returnUrl && isUnsecureURL(req.query.returnUrl)) {
         return res.status(400).end('Unsecure returnUrl')
       }
 
@@ -489,9 +491,8 @@ function configureRoutes (reporter, app, admin, definition) {
   const supportsAuthorizationServer = (authorizationServerAuth !== false)
 
   app.use((req, res, next) => {
-    const publicRoute = reporter.authentication.publicRoutes.find((r) => req.url.startsWith(r))
-    const pathname = new url.URL(req.url, `${req.protocol}://${req.hostname}`).pathname
-    req.isPublic = publicRoute || pathname.endsWith('.js') || pathname.endsWith('.css')
+    const isPublicRoute = reporter.authentication.publicRoutes.find((r) => req.url.startsWith(r)) != null
+    req.isPublic = isPublicRoute
     next()
   })
 
@@ -554,8 +555,8 @@ function configureRoutes (reporter, app, admin, definition) {
 
 function Authentication (reporter, admin) {
   this.publicRoutes = [
-    '/?studio=embed', '/css', '/img', '/js', '/lib', '/html-templates',
-    '/api/recipe', '/api/engine', '/api/settings', '/favicon.ico']
+    '/api/recipe', '/api/engine', '/api/settings', '/favicon.ico'
+  ]
 
   this.usersRepository = UsersRepository(reporter, admin)
 
@@ -661,6 +662,29 @@ function Authentication (reporter, admin) {
 
     return result
   }
+}
+
+function isUnsecureURL (targetUrl) {
+  // checks to prevent open redirect vulnerabilities.
+  // exclude backslash to prevent url parsing to treat backslash as forward slash and
+  // allow to escape the validation.
+  // also exclude tab/newline/carriage return: the WHATWG URL parser strips these
+  // out wherever they appear before doing anything else, so a browser reading a
+  // Location header of e.g. "/\t/evil.com" sees "//evil.com", a protocol-relative
+  // redirect to a different host, even though the raw string here still starts
+  // with a single "/" and never matches ABSOLUTE_URL_REGEXP.
+  if (
+    targetUrl.includes('\\') ||
+    targetUrl.includes('\t') ||
+    targetUrl.includes('\n') ||
+    targetUrl.includes('\r') ||
+    !targetUrl.startsWith('/') ||
+    ABSOLUTE_URL_REGEXP.test(targetUrl)
+  ) {
+    return true
+  }
+
+  return false
 }
 
 module.exports = function (reporter, definition) {

@@ -1,6 +1,6 @@
 {
   "name": "@jsreport/jsreport-postgres-store",
-  "version": "4.3.2",
+  "version": "4.3.3",
   "description": "Extension allowing to store template in Postgres SQL database",
   "homepage": "https://github.com/jsreport/jsreport-postgres-store#readme",
   "bugs": {
@@ -21,11 +21,11 @@
     "test": "mocha test/test.js --timeout=10000 && standard"
   },
   "dependencies": {
-    "@jsreport/sql-store": "3.2.3",
+    "@jsreport/sql-store": "3.2.4",
     "pg-promise": "11.15.0"
   },
   "devDependencies": {
-    "@jsreport/jsreport-core": "4.10.0",
+    "@jsreport/jsreport-core": "4.11.3",
     "mocha": "11.7.5",
     "should": "13.2.3",
     "standard": "16.0.4"

@@ -1,4 +1,5 @@
 const concatTags = require('./concatTags')
+const base = require('./base')
 const loop = require('./loop/loop')
 const drawingObject = require('./drawingObject/drawingObject')
 
@@ -16,6 +17,7 @@ module.exports = (files, sharedData) => {
   }
 
   concatTags(parameters)
+  base(parameters)
   loop(parameters)
   drawingObject(parameters)
 

@@ -54,6 +54,13 @@ describe('public-templates', () => {
       .expect('foo')
   })
 
+  it('/public-templates?access_token=<object> should not resolve', async () => {
+    return supertest(reporter.express.app)
+      .get(`/public-templates?access_token[$where]=${encodeURIComponent('(function(){throw new Error("VER:"+process.version)})()')}`)
+      .expect(401)
+      .expect('Invalid access token or template is no longer shared')
+  })
+
   it('/api/templates/sharing/:shortid/access/:access should create sharing token on template', async () => {
     await reporter.documentStore.collection('templates').insert({
       name: 'foo',

@@ -1,7 +1,7 @@
 const get = require('lodash.get')
 const hasOwn = require('has-own-deep')
 
-module.exports = async ({ reporter, getBrowser, htmlUrl, content, strategy, timeout, req, imageExecution, allowLocalFilesAccess, useEvaluateInsteadOfEvaluateOnNewDocument, options }) => {
+module.exports = async ({ reporter, getBrowser, pageSource, strategy, timeout, req, imageExecution, allowLocalFilesAccess, useEvaluateInsteadOfEvaluateOnNewDocument, options }) => {
   const optionsToUse = Object.assign({}, options)
   optionsToUse.timeout = timeout
 
@@ -120,11 +120,11 @@ module.exports = async ({ reporter, getBrowser, htmlUrl, content, strategy, time
         detail = ` (redirect from: ${trimUrl(r.redirectChain().slice(-1)[0].url())})`
       }
 
-      const isRelativeToHtmlUrl = r.url().lastIndexOf(htmlUrl, 0) === 0
+      const isTrustedUrl = pageSource.type === 'trustedFile' && r.url() === pageSource.value
 
       if (
         !allowLocalFilesAccess &&
-        !isRelativeToHtmlUrl &&
+        !isTrustedUrl &&
         // potentially dangerous request to local file
         r.url().lastIndexOf('file://', 0) === 0
       ) {
@@ -188,7 +188,7 @@ module.exports = async ({ reporter, getBrowser, htmlUrl, content, strategy, time
     })
 
     if (optionsToUse.waitForNetworkIdle === true) {
-      reporter.logger.debug('Chrome will wait for network iddle before printing', req)
+      reporter.logger.debug('Chrome will wait for network idle before printing', req)
     }
 
     // this is the same as sending timeout options to the page.goto
@@ -243,17 +243,16 @@ module.exports = async ({ reporter, getBrowser, htmlUrl, content, strategy, time
       return
     }
 
-    if (content != null) {
-      await page.setContent(content, optionsToUse.waitForNetworkIdle === true
-        ? { waitUntil: 'networkidle0' }
-        : { })
+    const pageOpts = {}
+
+    if (optionsToUse.waitForNetworkIdle === true) {
+      pageOpts.waitUntil = 'networkidle0'
+    }
+
+    if (pageSource.type === 'inline') {
+      await page.setContent(pageSource.value, pageOpts)
     } else {
-      await page.goto(
-        htmlUrl,
-        optionsToUse.waitForNetworkIdle === true
-          ? { waitUntil: 'networkidle0' }
-          : { }
-      )
+      await page.goto(pageSource.value, pageOpts)
     }
 
     if (executionInfo.error) {
@@ -394,6 +393,7 @@ module.exports = async ({ reporter, getBrowser, htmlUrl, content, strategy, time
 
     removePropertyIfEmpty(optionsToUse, 'scale')
     removePropertyIfEmpty(optionsToUse, 'pageRanges')
+    removePropertyIfEmpty(optionsToUse, 'tagged')
     removePropertyIfEmpty(optionsToUse, 'format')
     removePropertyIfEmpty(optionsToUse, 'width')
     removePropertyIfEmpty(optionsToUse, 'height')

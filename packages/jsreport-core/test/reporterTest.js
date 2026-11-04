@@ -188,6 +188,224 @@ describe('reporter', () => {
     should(logglyT).not.be.Undefined()
   })
 
+  describe('logger formats', () => {
+    const { MESSAGE } = require('../lib/main/loggerConstants')
+    const customFormatFixturePath = path.join(__dirname, 'fixtures', 'customLoggerFormat.js')
+
+    it('should produce JSON output when global format is "json"', async () => {
+      reporter = core({ discover: false, logger: { format: 'json' } })
+      await reporter.init()
+
+      const result = reporter.logger.format.transform({
+        level: 'info',
+        message: 'hello',
+        customField: 'value'
+      }, reporter.logger.format.options)
+
+      should(result).not.be.False()
+      const output = result[MESSAGE]
+      const parsed = JSON.parse(output)
+      should(parsed).have.property('level', 'info')
+      should(parsed).have.property('message', 'hello')
+      should(parsed).have.property('timestamp')
+      should(parsed).have.property('customField', 'value')
+    })
+
+    it('should produce text output when global format is "textWithTimestamp"', async () => {
+      reporter = core({ discover: false, logger: { format: 'textWithTimestamp' } })
+      await reporter.init()
+
+      const result = reporter.logger.format.transform({
+        level: 'info',
+        message: 'hello'
+      }, reporter.logger.format.options)
+
+      const output = result[MESSAGE]
+      should(output).match(/info: hello/)
+      // textWithTimestamp prefixes with an ISO timestamp
+      should(output).match(/^\d{4}-\d{2}-\d{2}T/)
+    })
+
+    it('should produce text output without timestamp when format is "text"', async () => {
+      reporter = core({ discover: false, logger: { format: 'text' } })
+      await reporter.init()
+
+      const result = reporter.logger.format.transform({
+        level: 'info',
+        message: 'hello'
+      }, reporter.logger.format.options)
+
+      const output = result[MESSAGE]
+      should(output).match(/^info: hello/)
+    })
+
+    it('should reject an unknown global format name', () => {
+      reporter = core({ discover: false, logger: { format: 'nonexistent-format' } })
+      return should(reporter.init()).be.rejectedWith(/Unknown logger format "nonexistent-format"/)
+    })
+
+    it('should accept a per-transport format as a string name', async () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          console: { transport: 'console', level: 'info', format: 'json' }
+        }
+      })
+
+      await reporter.init()
+
+      const consoleT = reporter.logger.transports.find((t) => t.name === 'console')
+      should(consoleT).not.be.Undefined()
+      // when format is set on a transport, winston attaches the resolved format instance
+      should(consoleT.format).not.be.Undefined()
+      should(typeof consoleT.format.transform).be.eql('function')
+    })
+
+    it('should reject an unknown per-transport format name', () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          console: { transport: 'console', level: 'info', format: 'bogus-format' }
+        }
+      })
+
+      return should(reporter.init()).be.rejectedWith(/Unknown logger format "bogus-format"/)
+    })
+
+    it('should not treat the "format" key as a transport', async () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          format: 'json',
+          console: { transport: 'console', level: 'info' }
+        }
+      })
+
+      await reporter.init()
+
+      const consoleT = reporter.logger.transports.find((t) => t.name === 'console')
+      should(consoleT).not.be.Undefined()
+      // "format" must not have been added as a transport
+      should(reporter.logger.transports.find((t) => t.name === 'format')).be.Undefined()
+    })
+
+    it('should not treat the "formats" key as a transport', async () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          formats: {},
+          console: { transport: 'console', level: 'info' }
+        }
+      })
+
+      await reporter.init()
+
+      const consoleT = reporter.logger.transports.find((t) => t.name === 'console')
+      should(consoleT).not.be.Undefined()
+      should(reporter.logger.transports.find((t) => t.name === 'formats')).be.Undefined()
+    })
+
+    it('should load a custom format from a module and make it usable by name', async () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          formats: {
+            mycustom: { module: customFormatFixturePath, options: { prefix: 'TEST' } }
+          },
+          format: 'mycustom'
+        }
+      })
+
+      await reporter.init()
+
+      const result = reporter.logger.format.transform({
+        level: 'info',
+        message: 'hello'
+      }, reporter.logger.format.options)
+
+      const output = result[MESSAGE]
+      should(output).eql('TEST: hello')
+    })
+
+    it('should allow a custom format on a per-transport basis', async () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          formats: {
+            mycustom: { module: customFormatFixturePath }
+          },
+          console: { transport: 'console', level: 'info', format: 'mycustom' }
+        }
+      })
+
+      await reporter.init()
+
+      const consoleT = reporter.logger.transports.find((t) => t.name === 'console')
+      should(consoleT).not.be.Undefined()
+      should(consoleT.format).not.be.Undefined()
+    })
+
+    it('should allow overriding a built-in format as a custom format', async () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          formats: {
+            json: { options: { space: 1 } }
+          },
+          format: 'json'
+        }
+      })
+
+      await reporter.init()
+
+      const result = reporter.logger.format.transform({
+        level: 'info',
+        message: 'hello',
+        customField: 'value'
+      }, reporter.logger.format.options)
+
+      should(result).not.be.False()
+      const output = result[MESSAGE]
+      should(output).containEql('\n')
+      const parsed = JSON.parse(output)
+      should(parsed).have.property('level', 'info')
+      should(parsed).have.property('message', 'hello')
+      should(parsed).have.property('timestamp')
+      should(parsed).have.property('customField', 'value')
+    })
+
+    it('should reject a custom format whose module cannot be found', () => {
+      reporter = core({
+        discover: false,
+        logger: {
+          formats: {
+            broken: { module: 'this-module-does-not-exist-xyz' }
+          },
+          format: 'broken'
+        }
+      })
+
+      return should(reporter.init()).be.rejectedWith(/module "this-module-does-not-exist-xyz" not found/)
+    })
+
+    it('should preserve metadata fields in JSON output', async () => {
+      reporter = core({ discover: false, logger: { format: 'json' } })
+      await reporter.init()
+
+      const result = reporter.logger.format.transform({
+        level: 'warn',
+        message: 'something happened',
+        operationId: 'op-123',
+        templateName: 'invoice'
+      })
+
+      const parsed = JSON.parse(result[MESSAGE])
+      should(parsed).have.property('level', 'warn')
+      should(parsed).have.property('operationId', 'op-123')
+      should(parsed).have.property('templateName', 'invoice')
+    })
+  })
+
   it('should create custom error', async () => {
     reporter = core({
       discover: false
@@ -986,6 +1204,18 @@ describe('reporter', () => {
     should(fs.readFileSync(result.pathToFile).toString()).be.eql('testing')
   })
 
+  it('should not create temp file using writeTempFile when using path outside temp directory', async () => {
+    reporter = core({
+      rootDirectory: path.join(__dirname, 'extensions/validExtensions')
+    })
+
+    await reporter.init()
+
+    return should(
+      reporter.writeTempFile((uuid) => path.join(__dirname, 'tmp', `something-${uuid}.txt`), 'testing')
+    ).be.rejectedWith('No valid filename')
+  })
+
   it('should throw error when try to use writeTempFile but instance is not initialized', async () => {
     reporter = core({
       rootDirectory: path.join(__dirname, 'extensions/validExtensions')
@@ -1096,6 +1326,16 @@ describe('reporter', () => {
 
     should(fs.existsSync(result.pathToFile)).be.eql(true)
     should(result.content.toString()).be.eql('testing')
+  })
+
+  it('should not read temp file using readTempFile when using path outside temp directory', async () => {
+    reporter = core({
+      rootDirectory: path.join(__dirname, 'extensions/validExtensions')
+    })
+
+    await reporter.init()
+
+    return should(reporter.readTempFile(__filename)).be.rejectedWith('No valid filename')
   })
 
   it('should throw error when try to use readTempFile but instance is not initialized', async () => {

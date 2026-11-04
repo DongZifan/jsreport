@@ -7,6 +7,15 @@ See https://jsreport.net/learn/pdf-utils
 
 ## Changelog
 
+### 4.5.7
+- preserve PDF/A-3 compliance when adding attachments
+
+### 4.5.6
+- pdfjs: fix support for attachments in the PDF/UA
+
+### 4.5.5
+- update deps to fix audit
+
 ### 4.5.4
 - update deps to fix audit
 

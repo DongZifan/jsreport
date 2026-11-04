@@ -93,7 +93,7 @@ function start (customInstance, socketFile) {
             hostname = new ipAddress.Address6(address.address).to4()
 
             if (typeof hostname !== 'string') {
-              hostname = hostname.address
+              hostname = hostname.correctForm()
             }
           } else {
             hostname = address.address

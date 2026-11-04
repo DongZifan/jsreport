@@ -51,7 +51,7 @@ module.exports = (reporter, definition) => {
       try {
         const reqBody = typeof req.body === 'string' ? serializator.parse(req.body) : req.body
         const result = await reporter.dockerManager.executeWorker(reqBody)
-        await reporter.dockerManager.handleRemoteHttpResponse(reqBody, result, res)
+        await reporter.dockerManager.handleRemoteHttpResponse(reqBody, res, result)
       } catch (e) {
         next(e)
       }
@@ -64,7 +64,7 @@ module.exports = (reporter, definition) => {
         try {
           const reqBody = serializator.parse(req.body)
           const result = await reporter.dockerManager.executeWorker(reqBody)
-          await reporter.dockerManager.handleRemoteHttpResponse(reqBody, result, res)
+          await reporter.dockerManager.handleRemoteHttpResponse(reqBody, res, result)
         } catch (e) {
           next(e)
         }
@@ -74,8 +74,14 @@ module.exports = (reporter, definition) => {
 
   reporter.initializeListeners.add('docker-workers', async () => {
     for (let i = 0; i < definition.options.numberOfWorkers; i++) {
-      await fs.mkdir(`${definition.options.container.sharedTempHostBindMountRootPath}/${definition.options.container.namePrefix}${i + 1}/autocleanup`, { recursive: true })
-      reporter.addPathToWatchForAutoCleanup(`${definition.options.container.sharedTempHostBindMountRootPath}/${definition.options.container.namePrefix}${i + 1}/autocleanup`)
+      // we use `sharedTempRewriteRootPathTo` because the file operation is executed in the
+      // context of the app that has docker-workers as dep.
+      // if this app is a container then the `sharedTempRewriteRootPathTo` will contain the valid path
+      // inside it, if not then this value already fallback to the
+      // `sharedTempHostBindMountRootPath` when not specified
+      const targetContainerWorkerPath = `${definition.options.container.sharedTempRewriteRootPathTo}/${definition.options.container.namePrefix}${i + 1}/autocleanup`
+      await fs.mkdir(targetContainerWorkerPath, { recursive: true })
+      reporter.addPathToWatchForAutoCleanup(targetContainerWorkerPath)
     }
   })
 
@@ -97,7 +103,7 @@ module.exports = (reporter, definition) => {
       }
     }
 
-    reporter.dockerManager.handleRemoteHttpResponse = async function handleRemoteHttpResponse (reqBody, workerResult, res) {
+    reporter.dockerManager.handleRemoteHttpResponse = async function handleRemoteHttpResponse (reqBody, res, workerResult) {
       if (reqBody.actionName === 'render') {
         // sending local response serialized as multipart to the original remote server
         // the response output can be buffer or stream, but we always send it as stream output

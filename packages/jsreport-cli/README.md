@@ -7,6 +7,15 @@ See http://jsreport.net/learn/cli for documentation
 
 ## Changelog
 
+### 4.2.4
+- update @jsreport/nodejs-client, ip-address, removed liftoff to fix audit
+
+### 4.2.3
+- update deps to fix audit
+
+### 4.2.2
+- update deps to fix audit
+
 ### 4.2.1
 - update deps to fix audit
 

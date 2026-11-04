@@ -20,6 +20,13 @@ module.exports = function (reporter, definition) {
       const fileExtension = res.meta.fileExtension
       const format = req.template.unoconv.format
 
+      if (!definition.options.allowedFormats.includes(format)) {
+        throw reporter.createError(`Unoconv format "${format}" is not allowed`, {
+          weak: true,
+          statusCode: 400
+        })
+      }
+
       let outputFilename
 
       const { pathToFile } = await res.output.writeToTempFile((uuid) => {

@@ -55,6 +55,12 @@ describe('query', function () {
     }, 'users', model).text.should.be.eql('SELECT [UserType].[address_street], [UserType].[address_number] FROM [UserType]')
   })
 
+  it('should support dotted projection on complex props', function () {
+    query(table, {
+      $select: { 'address.street': 1 }
+    }, 'users', model).text.should.be.eql('SELECT [UserType].[address_street] FROM [UserType]')
+  })
+
   it('should support projection on multiple props', function () {
     query(table, {
       $select: { int: 1, address: 1 }

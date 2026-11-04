@@ -1,39 +1,6 @@
 const _ = require('lodash')
 const filter = require('./filter')
 
-function getColumns (obj, entitySetName, model) {
-  const result = {}
-  const entityTypeName = model.entitySets[entitySetName].entityType.replace(model.namespace + '.', '')
-  const entityType = model.entityTypes[entityTypeName]
-
-  for (const columnName in entityType) {
-    const columnType = entityType[columnName]
-    if (columnType.isPrimitive) {
-      if (obj[columnName] != null) {
-        result[columnName] = [columnName]
-      }
-      continue
-    }
-
-    if (obj[columnName] === undefined) {
-      continue
-    }
-
-    if (columnType.complexType) {
-      for (const complexColumnName in columnType.complexType) {
-        result[columnName] = result[columnName] || []
-        result[columnName].push(columnName + '_' + complexColumnName)
-      }
-
-      continue
-    }
-
-    result[columnName] = [columnName]
-  }
-
-  return result
-}
-
 module.exports = function (table, options, entitySetName, model) {
   let query
 
@@ -50,10 +17,9 @@ module.exports = function (table, options, entitySetName, model) {
       query = table.select(table.star())
     } else {
       const columns = getColumns(options.$select, entitySetName, model)
-      for (const selectKey in options.$select) {
-        columns[selectKey].forEach((c) => {
-          query = (query || table).select(table[c])
-        })
+
+      for (const columnName of columns) {
+        query = (query || table).select(table[columnName])
       }
     }
   }
@@ -83,4 +49,79 @@ module.exports = function (table, options, entitySetName, model) {
   }
 
   return query.toQuery()
+}
+
+function getColumns (select, entitySetName, model) {
+  const columnGroups = new Map()
+  const entityTypeName = model.entitySets[entitySetName].entityType.replace(model.namespace + '.', '')
+  const entityType = model.entityTypes[entityTypeName]
+
+  const selectFields = Object.keys(select)
+
+  for (const columnName in entityType) {
+    const columnType = entityType[columnName]
+
+    if (columnType.isPrimitive) {
+      if (select[columnName] != null) {
+        columnGroups.set(columnName, [columnName])
+      }
+      continue
+    }
+
+    const hasNestedMatchInSelectFields = selectFields.some((f) => f.startsWith(`${columnName}.`))
+
+    if (select[columnName] === undefined && !hasNestedMatchInSelectFields) {
+      continue
+    }
+
+    if (columnType.complexType) {
+      let targetColumns
+
+      if (select[columnName] !== undefined) {
+        // if there is select for the root complex property then include all columns
+        targetColumns = Object.keys(columnType.complexType)
+      } else {
+        // otherwise include only the columns that are specified in the select object
+        targetColumns = selectFields.filter((f) => f.startsWith(`${columnName}.`)).map((f) => f.split('.')[1])
+      }
+
+      for (const complexColumnName of targetColumns) {
+        if (!columnGroups.has(columnName)) {
+          columnGroups.set(columnName, [])
+        }
+
+        columnGroups.get(columnName).push(columnName + '_' + complexColumnName)
+      }
+
+      continue
+    }
+
+    columnGroups.set(columnName, [columnName])
+  }
+
+  const topLevelSelectFields = getTopLevelFields(select)
+  const allColumns = []
+
+  for (const topField of topLevelSelectFields) {
+    const columnNames = columnGroups.get(topField) ?? []
+
+    if (columnNames.length > 0) {
+      allColumns.push(...columnNames)
+    }
+  }
+
+  return allColumns
+}
+
+function getTopLevelFields (select) {
+  // $select keys can be dotted paths into a nested complex type (e.g. 'chrome.headerTemplate'),
+  // we want to get a collection with only the top-level keys of fields as the result
+  const topLevelFields = new Set()
+
+  for (const key in select) {
+    const topLevelKey = key.split('.')[0]
+    topLevelFields.add(topLevelKey)
+  }
+
+  return topLevelFields
 }

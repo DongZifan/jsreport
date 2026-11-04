@@ -1,19 +1,13 @@
 const conversion = require('./conversion')
-const url = require('url')
+const preparePageSource = require('./preparePageSource')
+const { killBrowser } = require('./killBrowser')
 
-module.exports = ({ reporter, puppeteer, options }) => {
+module.exports = ({ reporter, puppeteer }) => {
   let openedBrowsers = []
   const execute = async ({ strategy, launchOptions, conversionOptions, req, imageExecution, allowLocalFilesAccess, onOutput, res }) => {
     let browser
 
-    let htmlUrl
-
-    if (conversionOptions.url) {
-      htmlUrl = conversionOptions.url
-    } else {
-      const { pathToFile } = await res.output.writeToTempFile((uuid) => `${uuid}-${imageExecution ? 'chrome-image' : 'chrome-pdf'}.html`)
-      htmlUrl = url.pathToFileURL(pathToFile)
-    }
+    const pageSource = await preparePageSource(reporter, imageExecution, allowLocalFilesAccess, conversionOptions, res)
 
     try {
       const result = await conversion({
@@ -23,7 +17,7 @@ module.exports = ({ reporter, puppeteer, options }) => {
           openedBrowsers.push(browser)
           return browser
         },
-        htmlUrl,
+        pageSource,
         strategy,
         req,
         timeout: reporter.getReportTimeout(req),
@@ -46,9 +40,7 @@ module.exports = ({ reporter, puppeteer, options }) => {
     } finally {
       if (browser) {
         try {
-          const pages = await browser.pages()
-          await Promise.all(pages.map(page => page.close()))
-          await browser.close()
+          await killBrowser(browser, { gracefulMs: 5000 })
         } finally {
           openedBrowsers = openedBrowsers.filter(b => b !== browser)
         }
@@ -57,15 +49,7 @@ module.exports = ({ reporter, puppeteer, options }) => {
   }
 
   execute.kill = async () => {
-    for (const browser of openedBrowsers) {
-      try {
-        const pages = await browser.pages()
-        await Promise.all(pages.map(page => page.close()))
-        await browser.close()
-      } catch (e) {
-
-      }
-    }
+    await Promise.all(openedBrowsers.map((browser) => killBrowser(browser).catch(() => {})))
   }
 
   return execute

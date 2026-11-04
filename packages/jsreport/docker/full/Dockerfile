@@ -23,15 +23,17 @@ RUN apt-get update && \
     # this ppa has builds available for architectures amd64, arm64 (which we care because we produce arm64 builds)
     # the default puppeteer download does not work for arm, because there is no arm version for chromium
     # https://github.com/puppeteer/puppeteer/issues/7740
-    add-apt-repository ppa:xtradeb/apps && \
-    apt-get update && \
+    add-apt-repository --no-update -y ppa:xtradeb/apps && \
+    apt-get -o Acquire::Retries=5 update --error-on=any && \
     # this condition is useful when the registry contain different latest versions
     # per architecture, if the versions match then just use the same version number on both paths
     if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-    apt install -y chromium=147.0.7727.116-1xtradeb1.2404.1; \
+    apt-get -o Acquire::Retries=5 install -y chromium=156.0.8078.47-1xtradeb1.2404.1 chromium-common=156.0.8078.47-1xtradeb1.2404.1; \
     elif [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-    apt install -y chromium=147.0.7727.116-1xtradeb1.2404.1; \
+    apt-get -o Acquire::Retries=5 install -y chromium=156.0.8078.47-1xtradeb1.2404.1 chromium-common=156.0.8078.47-1xtradeb1.2404.1; \
     fi && \
+    test -x /usr/bin/chromium && \
+    /usr/bin/chromium --version && \
     # fonts for chrome
     apt install -y fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst && \
     # unoconv
@@ -83,16 +85,16 @@ RUN npm install --save --save-exact @jsreport/jsreport-ejs@4.1.0 \
     @jsreport/jsreport-pug@5.1.0 \
     @jsreport/jsreport-aws-s3-storage@4.2.0 \
     @jsreport/jsreport-azure-storage@4.2.0 \
-    @jsreport/jsreport-docxtemplater@4.2.1 \
-    @jsreport/jsreport-mssql-store@4.2.2 \
-    @jsreport/jsreport-postgres-store@4.3.2 \
-    @jsreport/jsreport-mongodb-store@4.2.0 \
+    @jsreport/jsreport-docxtemplater@4.2.4 \
+    @jsreport/jsreport-mssql-store@4.2.3 \
+    @jsreport/jsreport-postgres-store@4.3.3 \
+    @jsreport/jsreport-mongodb-store@4.2.1 \
     @jsreport/jsreport-office-password@4.2.0 \
     @jsreport/jsreport-html-to-text@4.3.0 \
-    @jsreport/jsreport-html-embedded-in-docx@4.2.1 \
-    @jsreport/jsreport-fs-store-aws-s3-persistence@4.2.1 \
+    @jsreport/jsreport-html-embedded-in-docx@4.2.4 \
+    @jsreport/jsreport-fs-store-aws-s3-persistence@4.2.2 \
     @jsreport/jsreport-fs-store-azure-storage-persistence@4.2.0 \
-    @jsreport/jsreport-unoconv@4.2.0 \
+    @jsreport/jsreport-unoconv@4.2.1 \
     @jsreport/jsreport-libreoffice@1.1.0 \
     cheerio-page-eval@1.4.0
 
@@ -100,7 +102,7 @@ COPY ./packages/jsreport/docker/full/install-or-build-oracledb-for-store.js inst
 COPY ./packages/jsreport/docker/full/build-oracledb-src.sh build-oracledb-src.sh
 # script created with steps recommend here from oracledb repository
 # https://github.com/oracle/node-oracledb/issues/1382#issuecomment-849157748
-RUN node install-or-build-oracledb-for-store.js --target=$TARGETPLATFORM --storeVersion=4.2.2
+RUN node install-or-build-oracledb-for-store.js --target=$TARGETPLATFORM --storeVersion=4.2.3
 
 RUN npm cache clean -f && rm -rf /tmp/*
 

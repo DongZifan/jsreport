@@ -878,16 +878,27 @@ function normalizePageSetupProperties (table) {
   }
 
   if (table.pageSetup.margins != null) {
+    const defaults = {
+      left: 0.7,
+      right: 0.7,
+      top: 0.75,
+      bottom: 0.75,
+      header: 0.3,
+      footer: 0.3
+    }
+
     const sides = ['left', 'right', 'top', 'bottom', 'header', 'footer']
 
     for (const side of sides) {
+      let parsedValue
+
       if (table.pageSetup.margins[side] == null) {
-        continue
+        parsedValue = defaults[side]
+      } else {
+        parsedValue = parseFloat(table.pageSetup.margins[side])
       }
 
-      const parsedValue = parseFloat(table.pageSetup.margins[side])
-
-      if (isNaN(parsedValue)) {
+      if (parsedValue == null || isNaN(parsedValue)) {
         throw new Error(`The page margin ${side} property should be a number, received: ${table.pageSetup.margins[side]}`)
       }
 

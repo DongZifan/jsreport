@@ -1,10 +1,12 @@
 const conversion = require('./conversion')
-const url = require('url')
+const preparePageSource = require('./preparePageSource')
+const { killBrowser } = require('./killBrowser')
 
 module.exports = ({ reporter, puppeteer, options }) => {
   const pool = []
   const tasksQueue = []
   const { numberOfWorkers } = options
+  let closing = false
 
   if (numberOfWorkers < 1) {
     throw new Error('"numberOfWorkers" must be a number greater or equal than 1')
@@ -17,14 +19,7 @@ module.exports = ({ reporter, puppeteer, options }) => {
     let crashError = false
     let timeoutError = false
 
-    let htmlUrl
-
-    if (conversionOptions.url) {
-      htmlUrl = conversionOptions.url
-    } else {
-      const { pathToFile } = await res.output.writeToTempFile((uuid) => `${uuid}-${imageExecution ? 'chrome-image' : 'chrome-pdf'}.html`)
-      htmlUrl = url.pathToFileURL(pathToFile)
-    }
+    const pageSource = await preparePageSource(reporter, imageExecution, allowLocalFilesAccess, conversionOptions, res)
 
     try {
       const result = await conversion({
@@ -45,7 +40,7 @@ module.exports = ({ reporter, puppeteer, options }) => {
 
           return browserInfo.instance
         },
-        htmlUrl,
+        pageSource,
         strategy,
         req,
         timeout: reporter.getReportTimeout(req),
@@ -81,7 +76,9 @@ module.exports = ({ reporter, puppeteer, options }) => {
       }
 
       if ((crashError || timeoutError) && browserInfo) {
-        recycleBrowser(puppeteer, browserInfo, launchOptions).catch(() => {})
+        recycleBrowser(puppeteer, browserInfo, launchOptions, { isClosing: () => closing }).catch(() => {}).then(() => {
+          tryFlushTasksQueue(puppeteer, pool, tasksQueue)
+        })
       } else if (page && !page.isClosed()) {
         await page.close()
       }
@@ -91,21 +88,22 @@ module.exports = ({ reporter, puppeteer, options }) => {
   }
 
   execute.kill = async () => {
-    const op = []
+    closing = true
 
-    pool.forEach(async (browserInfo) => {
+    await Promise.all(pool.map(async (browserInfo) => {
       if (browserInfo.recycling) {
-        op.push(browserInfo.recycling.then(async () => {
-          if (browserInfo.instance) {
-            return browserInfo.instance.pages().then(pages => Promise.all(pages.map(page => page.close()))).then(() => browserInfo.instance.close())
-          }
-        }))
-      } else if (browserInfo.instance) {
-        op.push(browserInfo.instance.pages().then(pages => Promise.all(pages.map(page => page.close()))).then(() => browserInfo.instance.close()))
+        await Promise.race([browserInfo.recycling, new Promise((resolve) => setTimeout(resolve, 4000).unref())])
       }
-    })
 
-    return Promise.all(op)
+      if (!browserInfo.instance) {
+        return
+      }
+
+      const instance = browserInfo.instance
+
+      browserInfo.instance = null
+      await killBrowser(instance)
+    }))
   }
 
   return execute
@@ -127,7 +125,18 @@ async function allocateBrowser (puppeteer, pool, tasksQueue, options) {
   if (pool.length < numberOfWorkers) {
     browserInfo = { instance: undefined, isBusy: true }
     pool.push(browserInfo)
-    await createBrowser(puppeteer, browserInfo, launchOptions)
+
+    try {
+      await createBrowser(puppeteer, browserInfo, launchOptions)
+    } catch (e) {
+      const index = pool.indexOf(browserInfo)
+
+      if (index !== -1) {
+        pool.splice(index, 1)
+      }
+
+      throw e
+    }
   } else {
     // simple round robin balancer across browsers,
     // get the first available browser from the list
@@ -144,7 +153,12 @@ async function allocateBrowser (puppeteer, pool, tasksQueue, options) {
       // however there is small chance that an error while recycling a chrome instance happens
       // and we end with .instance being null, in which case we need to create it here
       if (browserInfo.instance == null) {
-        await createBrowser(puppeteer, browserInfo, launchOptions)
+        try {
+          await createBrowser(puppeteer, browserInfo, launchOptions)
+        } catch (e) {
+          browserInfo.isBusy = false
+          throw e
+        }
       }
     } else {
       return new Promise((resolve, reject) => {
@@ -161,7 +175,7 @@ async function allocateBrowser (puppeteer, pool, tasksQueue, options) {
   }
 }
 
-async function recycleBrowser (puppeteer, browserInfo, launchOptions) {
+async function recycleBrowser (puppeteer, browserInfo, launchOptions, { isClosing } = {}) {
   browserInfo.isBusy = true
 
   let resolveRecycling
@@ -170,23 +184,26 @@ async function recycleBrowser (puppeteer, browserInfo, launchOptions) {
     resolveRecycling = resolve
   })
 
-  if (browserInfo.instance) {
-    try {
-      const pages = await browserInfo.instance.pages()
-      await Promise.all(pages.map(page => page.close()))
-    } finally {
-      await browserInfo.instance.close()
-    }
-  }
-
-  // clean the property before trying to get new instance, this let us
-  // create the instance later if for some reason the instance can not be
-  // created during recycling
-  browserInfo.instance = null
-
   try {
+    if (browserInfo.instance) {
+      const instance = browserInfo.instance
+      browserInfo.instance = null
+      await killBrowser(instance)
+    }
+
+    // clean the property before trying to get new instance, this let us
+    // create the instance later if for some reason the instance can not be
+    // created during recycling
+    browserInfo.instance = null
+
+    if (isClosing()) {
+      return
+    }
+
     await createBrowser(puppeteer, browserInfo, launchOptions)
   } finally {
+    browserInfo.recycling = null
+
     if (resolveRecycling) {
       resolveRecycling()
     }

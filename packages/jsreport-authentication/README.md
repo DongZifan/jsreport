@@ -7,6 +7,20 @@ See https://jsreport.net/learn/authentication
 
 ## Changelog
 
+### 4.3.5
+- update body-parser to fix audit
+
+### 4.3.4
+- update openid-client to latest v5 to fix audit
+- check only against the whitelist of publicRoutes and not on extension suffixes
+- reject tab/newline/CR in returnUrl
+
+### 4.3.3
+- fix security issue
+
+### 4.3.2
+- update deps to fix audit
+
 ### 4.3.1
 - update deps to fix audit
 

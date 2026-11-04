@@ -5,7 +5,7 @@ const { compress, decompress } = require('./utils')
 
 module.exports = async function (reporter, definition) {
   if (reporter.compilation) {
-    const chromeExecutablePath = puppeteer.executablePath()
+    const chromeExecutablePath = await puppeteer.executablePath()
     const chromePath = path.dirname(chromeExecutablePath)
     let chromeExecutableName = path.basename(chromeExecutablePath)
 
